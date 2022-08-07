@@ -2,7 +2,7 @@
 
 mod map;
 mod map_builder;
-mod player;
+
 mod camera;
 mod components;
 mod spawner;
@@ -28,7 +28,7 @@ use prelude::*;
 
 struct State {
     ecs : World,
-    // resources : Resources,
+    resources : Resources,
     systems: Schedule
 }
 
@@ -43,7 +43,7 @@ impl State {
        resources.insert(Camera::new(map_builder.player_start));
        Self {
            ecs,
-        //    resources,
+           resources,
            systems: build_scheduler()
        }
     }
@@ -57,6 +57,7 @@ impl GameState for State {
         ctx.cls();
         self.resources.insert(ctx.key);
         self.systems.execute(&mut self.ecs, &mut self.resources);
+        render_draw_buffer(ctx).expect("Render error");
 
     }
 }

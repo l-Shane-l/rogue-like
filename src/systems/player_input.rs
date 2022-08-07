@@ -10,7 +10,7 @@ pub fn player_input(
     #[resource] camera: &mut Camera
 )
 {
-    if let SOme(key) = key {
+    if let Some(key) = key {
         let delta = match key {
             VirtualKeyCode::Left => Point::new(-1, 0),
             VirtualKeyCode::Right => Point::new(1,0),
@@ -21,7 +21,7 @@ pub fn player_input(
         if delta.x != 0 || delta.y !=0 {
             let mut players = <&mut Point>::query()
                 .filter(component::<Player>());
-            players.iter_mut(ecs).for_each([pos] {
+            players.iter_mut(ecs).for_each(|pos| {
                 let destination = *pos + delta;
                 if map.can_enter_tile(destination) {
                     *pos = destination;
