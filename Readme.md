@@ -1,4 +1,4 @@
-# Rouge like
+# Rouge like terminal game
 
 ## cargo build
 
