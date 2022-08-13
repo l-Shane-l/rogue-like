@@ -2,8 +2,10 @@ use crate::prelude::*;
 mod empty;
 //mod rooms;
 //use rooms::RoomsArchitect;
-mod automata;
-use automata::CellularAutomataArchitect;
+//mod automata;
+//use automata::CellularAutomataArchitect;
+mod drunkard;
+use drunkard::DrunkardsWalkArchitect;
 
 trait MapArchitect {
     fn new(&mut self, rng: &mut RandomNumberGenerator) -> MapBuilder;
@@ -20,7 +22,7 @@ pub struct MapBuilder {
 
 impl MapBuilder {
     pub fn new(rng: &mut RandomNumberGenerator) -> Self {
-        let mut architect = CellularAutomataArchitect {};
+        let mut architect = DrunkardsWalkArchitect {};
         architect.new(rng)
     }
 
@@ -48,6 +50,17 @@ impl MapBuilder {
                 .unwrap()
                 .0,
         )
+    }
+
+    fn add_boundaries(&mut self) {
+        for x in 1..SCREEN_WIDTH {
+            self.map.tiles[map_idx(x, 1)] = TileType::Wall;
+            self.map.tiles[map_idx(x, SCREEN_HEIGHT - 1)] = TileType::Wall;
+        }
+        for y in 1..SCREEN_HEIGHT {
+            self.map.tiles[map_idx(1, y)] = TileType::Wall;
+            self.map.tiles[map_idx(SCREEN_WIDTH - 1, y)] = TileType::Wall;
+        }
     }
 
     fn build_random_rooms(&mut self, rng: &mut RandomNumberGenerator) {
@@ -120,22 +133,19 @@ impl MapBuilder {
             .tiles
             .iter()
             .enumerate()
-            .filter(|(idx, t)|// (1)
-                **t == TileType::Floor &&
-                    DistanceAlg::Pythagoras.distance2d(
-                        *start,
-                        self.map.index_to_point2d(*idx)
-                    ) > 10.0)
+            .filter(|(idx, t)| {
+                **t == TileType::Floor
+                    && DistanceAlg::Pythagoras.distance2d(*start, self.map.index_to_point2d(*idx))
+                        > 10.0
+            })
             .map(|(idx, _)| self.map.index_to_point2d(idx))
             .collect();
 
         let mut spawns = Vec::new();
         for _ in 0..NUM_MONSTERS {
-            let target_index = rng
-                .random_slice_index(&spawnable_tiles) // (2)
-                .unwrap();
+            let target_index = rng.random_slice_index(&spawnable_tiles).unwrap();
             spawns.push(spawnable_tiles[target_index].clone());
-            spawnable_tiles.remove(target_index); // (3)
+            spawnable_tiles.remove(target_index);
         }
         spawns
     }
