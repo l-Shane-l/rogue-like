@@ -7,11 +7,12 @@ use crate::prelude::*;
 #[write_component(Health)]
 #[read_component(Item)]
 #[read_component(Carried)]
+#[read_component(Weapon)]
 pub fn player_input(
     ecs: &mut SubWorld,
     commands: &mut CommandBuffer,
-    #[resource] key: &Option<VirtualKeyCode>,
-    #[resource] turn_state: &mut TurnState,
+    #[resource] key : &Option<VirtualKeyCode>,
+    #[resource] turn_state : &mut TurnState
 ) {
     let mut players = <(Entity, &Point)>::query().filter(component::<Player>());
     let mut enemies = <(Entity, &Point)>::query().filter(component::<Enemy>());
@@ -23,22 +24,32 @@ pub fn player_input(
             VirtualKeyCode::Up => Point::new(0, -1),
             VirtualKeyCode::Down => Point::new(0, 1),
             VirtualKeyCode::G => {
-                // (1)
-                let (player, player_pos) = players // (2)
+                let (player, player_pos) = players
                     .iter(ecs)
-                    .find_map(|(entity, pos)| Some((*entity, *pos))) // (3)
+                    .find_map(|(entity, pos)| Some((*entity, *pos)))
                     .unwrap();
 
-                let mut items = <(Entity, &Item, &Point)>::query(); // (4)
-                items
-                    .iter(ecs)
-                    .filter(|(_entity, _item, &item_pos)| item_pos == player_pos) // (5)
+                let mut items = <(Entity, &Item, &Point)>::query();
+                items.iter(ecs)
+                    .filter(|(_entity, _item, &item_pos)| item_pos == player_pos)
                     .for_each(|(entity, _item, _item_pos)| {
-                        commands.remove_component::<Point>(*entity); // (6)
-                        commands.add_component(*entity, Carried(player)); // (7)
-                    });
+                        commands.remove_component::<Point>(*entity);
+                        commands.add_component(*entity, Carried(player));
+
+                        if let Ok(e) = ecs.entry_ref(*entity) {
+                            if e.get_component::<Weapon>().is_ok() {// (1)
+                                <(Entity, &Carried, &Weapon)>::query()
+                                .iter(ecs)
+                                .filter(|(_, c, _)| c.0 == player)
+                                .for_each(|(e, c, w)| {
+                                    commands.remove(*e);// (2)
+                                })
+                            }
+                        }
+                    }
+                );
                 Point::new(0, 0)
-            }
+            },
             VirtualKeyCode::Key1 => use_item(0, ecs, commands),
             VirtualKeyCode::Key2 => use_item(1, ecs, commands),
             VirtualKeyCode::Key3 => use_item(2, ecs, commands),
@@ -52,68 +63,63 @@ pub fn player_input(
         };
 
         let (player_entity, destination) = players
-            .iter(ecs)
-            .find_map(|(entity, pos)| Some((*entity, *pos + delta)))
-            .unwrap();
+                .iter(ecs)
+                .find_map(|(entity, pos)| Some((*entity, *pos + delta)) )
+                .unwrap();
 
         let mut did_something = false;
-        if delta.x != 0 || delta.y != 0 {
-            let mut hit_something = false;
-            enemies
-                .iter(ecs)
-                .filter(|(_, pos)| **pos == destination)
-                .for_each(|(entity, _)| {
-                    hit_something = true;
-                    did_something = true;
+        if delta.x !=0 || delta.y != 0 {
 
-                    commands.push((
-                        (),
-                        WantsToAttack {
-                            attacker: player_entity,
-                            victim: *entity,
-                        },
-                    ));
-                });
+        let mut hit_something = false;
+        enemies
+            .iter(ecs)
+            .filter(|(_, pos)| {
+                **pos == destination
+            })
+            .for_each(|(entity, _) | {
+                hit_something = true;
+                did_something = true;
+
+                commands
+                    .push(((), WantsToAttack{
+                        attacker: player_entity,
+                        victim: *entity,
+                    }));
+            });
 
             if !hit_something {
                 did_something = true;
-                commands.push((
-                    (),
-                    WantsToMove {
+                commands
+                    .push(((), WantsToMove{
                         entity: player_entity,
-                        destination,
-                    },
-                ));
+                        destination
+                    }));
             }
         };
         *turn_state = TurnState::PlayerTurn;
     }
 }
 
-fn use_item(n: usize, ecs: &mut SubWorld, commands: &mut CommandBuffer) -> Point {
-    // (8)
+fn use_item(n: usize, ecs: &mut SubWorld, commands: &mut CommandBuffer) 
+-> Point {
     let player_entity = <(Entity, &Player)>::query()
-        .iter(ecs)
-        .find_map(|(entity, _player)| Some(*entity))
-        .unwrap(); // (9)
+                    .iter(ecs)
+                    .find_map(|(entity, _player)| Some(*entity))
+                    .unwrap();
 
-    let item_entity = <(Entity, &Item, &Carried)>::query() // (10)
+    let item_entity = <(Entity, &Item, &Carried)>::query()
         .iter(ecs)
         .filter(|(_, _, carried)| carried.0 == player_entity)
-        .enumerate() // (11)
-        .filter(|(item_count, (_, _, _))| *item_count == n) // (12)
-        .find_map(|(_, (item_entity, _, _))| Some(*item_entity)); // (13)
+        .enumerate()
+        .filter(|(item_count, (_, _, _))| *item_count == n)
+        .find_map(|(_, (item_entity, _, _))| Some(*item_entity));
 
     if let Some(item_entity) = item_entity {
-        // (14)
-        commands.push((
-            (),
-            ActivateItem {
-                // (15)
+        commands
+            .push(((), ActivateItem{
                 used_by: player_entity,
-                item: item_entity,
-            },
-        ));
+                item: item_entity
+            }));
     }
 
     Point::zero()
